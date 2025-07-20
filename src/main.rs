@@ -1,4 +1,5 @@
 use std::{
+    f64,
     sync::mpsc::{self, Receiver},
     thread,
     time::Duration,
@@ -12,7 +13,7 @@ use ratatui::{
     style::Style,
     widgets::{Block, Borders, Paragraph},
 };
-use sysinfo::System;
+use sysinfo::{Cpu, System};
 
 fn main() -> color_eyre::Result<()> {
     let (event_tx, event_rx) = mpsc::channel::<Event>();
@@ -42,7 +43,11 @@ fn handle_input_events(tx_to_input_events: mpsc::Sender<Event>) {
     loop {
         sys.refresh_all();
         let free_memory = sys.free_memory();
+        let cpu_usage = sys.global_cpu_usage();
         if tx_to_input_events.send(Event::Memory(free_memory)).is_err() {
+            break;
+        }
+        if tx_to_input_events.send(Event::CPU(cpu_usage)).is_err() {
             break;
         }
         thread::sleep(Duration::from_millis(500));
@@ -52,6 +57,7 @@ fn handle_input_events(tx_to_input_events: mpsc::Sender<Event>) {
 pub(crate) enum Event {
     Input(crossterm::event::KeyEvent), // crossterm key input event
     Memory(u64),
+    CPU(f32),
 }
 
 /// The main application which holds the state and logic of the application.
@@ -60,6 +66,7 @@ pub struct App {
     /// Is the application running?
     running: bool,
     latest_mem: Option<u64>,
+    latest_cpu: Option<f32>,
 }
 
 impl App {
@@ -68,6 +75,7 @@ impl App {
         Self {
             running: true,
             latest_mem: None,
+            latest_cpu: None,
         }
     }
 
@@ -87,21 +95,25 @@ impl App {
             match event {
                 Event::Memory(mem) => self.latest_mem = Some(mem),
                 Event::Input(key_event) => self.on_key_event(key_event),
+                Event::CPU(cpu) => self.latest_cpu = Some(cpu),
             }
         }
         let layout = Layout::default()
             .direction(Direction::Vertical)
-            .constraints(vec![Constraint::Percentage(100)])
+            .constraints(vec![Constraint::Percentage(50), Constraint::Percentage(50)])
             .split(frame.area());
 
         if let Some(mem) = &self.latest_mem {
-            self.render_memory(mem, layout[0], frame);
+            self.render_memory(mem, layout[0], frame, "memory info");
+        }
+        if let Some(cpu) = self.latest_cpu {
+            self.render_memory(cpu, layout[1], frame, "cpu info");
         }
     }
 
-    fn render_memory(&self, mem: impl ToString, area: Rect, frame: &mut Frame) {
+    fn render_memory(&self, mem: impl ToString, area: Rect, frame: &mut Frame, header: &str) {
         let block = Block::new()
-            .title("Memory Info")
+            .title(header)
             .borders(Borders::ALL)
             .style(Style::default().fg(ratatui::style::Color::Red));
 

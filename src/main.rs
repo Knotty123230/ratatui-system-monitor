@@ -1,5 +1,4 @@
 use std::{
-    f64,
     sync::mpsc::{self, Receiver},
     thread,
     time::Duration,
@@ -13,7 +12,7 @@ use ratatui::{
     style::Style,
     widgets::{Block, Borders, Paragraph},
 };
-use sysinfo::{Cpu, System};
+use sysinfo::System;
 
 fn main() -> color_eyre::Result<()> {
     let (event_tx, event_rx) = mpsc::channel::<Event>();
@@ -104,14 +103,14 @@ impl App {
             .split(frame.area());
 
         if let Some(mem) = &self.latest_mem {
-            self.render_memory(mem, layout[0], frame, "memory info");
+            self.render_col(mem, layout[0], frame, "memory info");
         }
         if let Some(cpu) = self.latest_cpu {
-            self.render_memory(cpu, layout[1], frame, "cpu info");
+            self.render_col(cpu, layout[1], frame, "cpu info");
         }
     }
 
-    fn render_memory(&self, mem: impl ToString, area: Rect, frame: &mut Frame, header: &str) {
+    fn render_col(&self, mem: impl ToString, area: Rect, frame: &mut Frame, header: &str) {
         let block = Block::new()
             .title(header)
             .borders(Borders::ALL)
